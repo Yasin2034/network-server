@@ -16,15 +16,6 @@ public class JsonUtil {
         return stringWriter.toString();
     }
 
-    public String convertToJsonMessage(String message){
-        StringWriter stringWriter = new StringWriter();
-        Json.createWriter(stringWriter).writeObject(Json.createObjectBuilder()
-                .add("username", "Server")
-                .add("message", message)
-                .build());
-        return stringWriter.toString();
-    }
-
     public String submitUserPort(String code, String port){
         StringWriter stringWriter = new StringWriter();
         Json.createWriter(stringWriter).writeObject(Json.createObjectBuilder()

@@ -5,7 +5,6 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 
 @Getter
@@ -28,7 +27,7 @@ public class Server extends Thread{
         Thread loginChecker = new Thread(()->{
            while (true){
                try {
-                   sleep(10_000);
+                   sleep(1_000);
                    Set<User> passiveUsers = onlineUsers
                            .stream()
                            .filter(u-> System.currentTimeMillis() - u.getLastUpdatedTime() > 20_000)
