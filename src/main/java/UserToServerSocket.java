@@ -1,6 +1,8 @@
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import javax.json.Json;
+import javax.json.JsonObject;
 import java.io.*;
 import java.net.Socket;
 import java.util.Objects;
@@ -13,104 +15,74 @@ public class UserToServerSocket extends Thread{
     private final Socket socket;
     private PrintWriter sender;
     private BufferedReader reader;
-    private boolean isLoggedIn;
     private User user;
     private long lastUpdatedTime = System.currentTimeMillis();
 
     @Override
     public void run() {
         try {
-            while(true) {
                 reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 sender = new PrintWriter(socket.getOutputStream(), true);
-
-                sender.println(Util.formatMessage("server","1)Login \n2)Register"));
                 listen(reader);
-            }
 
         } catch(Exception e ) {
             e.printStackTrace();
         }
     }
 
-    private void listen(BufferedReader reader) throws IOException {
-        boolean isMenuPrinted = false;
-        while(true) {
-            String input = null;
-            if(isLoggedIn){
-                if(!isMenuPrinted){
-                    sender.println(Util.formatMessage("server","Welcome!"));
-                    sender.println(Util.formatMessage("server","1) find user"));
-                    sender.println(Util.formatMessage("server","if you want to exit, please logout"));
-                    isMenuPrinted = true;
+    private void listen(BufferedReader reader) {
+        while (true) {
+            JsonObject jsonObject = Json.createReader(reader).readObject();
+            String code = jsonObject.getString("code");
+            if (code.equalsIgnoreCase(Codes.LOGIN)){
+                String username = jsonObject.getString("username");
+                String password = jsonObject.getString("password");
+                User findedUser = server.getUsers().stream().filter(u-> u.getUsername().equalsIgnoreCase(username)).findFirst().orElse(null);
+                if(Objects.isNull(findedUser)){
+                    sender.println(JsonUtil.convertToJsonMessage(Codes.LOGIN_FAULT,""));
                 }
-                input = reader.readLine();
-                if (input.equals("1")){
-                    input = null;
-                    while (input == null) {
-                        sender.println(Util.formatMessage("server","give me a username"));
-                        input = reader.readLine();
-                    }
-                    String finalInput = input;
-                    User findedUser = server.getOnlineUsers().stream().filter(u->u.getUsername().equalsIgnoreCase(finalInput)).findFirst().orElse(null);
-                    if(findedUser != null){
-                        sender.println("userport:"+findedUser.getPort());
-                        this.interrupt();
+                else{
+                    if(findedUser.getPassword().equalsIgnoreCase(password)){
+                        StringWriter stringWriter = new StringWriter();
+                        Json.createWriter(stringWriter).writeObject(Json.createObjectBuilder()
+                                .add("code", Codes.LOGIN_SUCCESS)
+                                .add("username", username)
+                                .build());
+                        findedUser.setPort(jsonObject.getString("port"));
+                        server.getOnlineUsers().remove(findedUser);
+                        server.getOnlineUsers().add(findedUser);
+                        user = findedUser;
+                        sender.println(stringWriter.toString());
                     }else{
-                        sender.println(Util.formatMessage("server","user not found"));
-                        isMenuPrinted = false;
+                        sender.println(JsonUtil.convertToJsonMessage(Codes.LOGIN_FAULT,""));
                     }
-                }else if(input.contains("port")){
-                    user.setPort(input.split(":")[1]);
-                    server.getOnlineUsers().add(user);
-                    isMenuPrinted = false;
-                }else if(input.equalsIgnoreCase("LOGOUT")){
-                    server.getOnlineUsers().remove(user);
-                    socket.close();
-                    this.stop();
-                    break;
+                }
+            }else if(code.equalsIgnoreCase(Codes.REGISTER)){
+                String username = jsonObject.getString("username");
+                String password = jsonObject.getString("password");
+                User findedUser = server.getUsers().stream().filter(u-> u.getUsername().equalsIgnoreCase(username)).findFirst().orElse(null);
+                if(Objects.nonNull(findedUser)){
+                    sender.println(JsonUtil.convertToJsonMessage(Codes.REGISTER_FAULT,""));
+                }
+                else{
+                    server.addUser(new User(username,password));
+                    sender.println(JsonUtil.convertToJsonMessage(Codes.REGISTER_SUCCESS,""));
                 }
 
-            }else{
-                input = reader.readLine();
-                if(input.equals("1")){
-                    User user;
-                    String password;
-                    while (true){
-                        sender.println(Util.formatMessage("server","please enter username"));
-                        String username = reader.readLine();
-                        user = server.getUsers().stream().filter(u-> u.getUsername().equalsIgnoreCase(username)).findFirst().orElse(null);
-                        if(Objects.nonNull(user)){
-                            sender.println(Util.formatMessage("server","please enter password"));
-                            password = reader.readLine();
-                            if(password.equalsIgnoreCase(user.getPassword())){
-                                this.user = user;
-                                sender.println(Util.formatMessage("server","you are logged in"));
-                                sender.println(Util.formatMessage("server","200"));
-                                isLoggedIn = true;
-                                break;
-                            }
-                        }
-                    }
-                }else if(input.equals("2")){
-                    while (true){
-                        sender.println(Util.formatMessage("server","please enter username"));
-                        String username = reader.readLine();
-                        user = server.getUsers().stream().filter(u-> u.getUsername().equalsIgnoreCase(username)).findFirst().orElse(null);
-                        if(Objects.isNull(user)){
-                            sender.println(Util.formatMessage("server","please enter password"));
-                            String password = reader.readLine();
-                            User user = new User(username,password);
-                            server.addUser(user);
-                            sender.println(Util.formatMessage("server","you are registered"));
-                            break;
-                        }else if(Objects.nonNull(user)){
-                            sender.println(Util.formatMessage("server","username is used"));
-                        }
-                    }
+            }else if(code.equalsIgnoreCase(Codes.LOGOUT)){
+               server.getOnlineUsers().remove(user);
+               interrupt();
+            }else if(code.equalsIgnoreCase(Codes.SEARCH_USER)){
+                String username = jsonObject.getString("username");
+                User findedUser = server.getOnlineUsers().stream().filter(u-> u.getUsername().equalsIgnoreCase(username)).findFirst().orElse(null);
+                if(Objects.isNull(findedUser)){
+                    sender.println(JsonUtil.convertToJsonMessage(Codes.ONLINE_USER_NOT_FOUND,""));
+                }else{
+                    sender.println(JsonUtil.submitUserPort(Codes.ONLINE_USER_FOUND,findedUser.getPort()));
                 }
-                lastUpdatedTime = System.currentTimeMillis();
             }
+
+
         }
     }
 
