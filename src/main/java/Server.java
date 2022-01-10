@@ -76,6 +76,12 @@ public class Server extends Thread{
             user.setLastUpdatedTime(System.currentTimeMillis());
             onlineUsers.add(user);
             receive = new byte[65535];
+            try {
+                Main.fileWriter.write(jsonObject.toString() + "\n");
+                Main.fileWriter.flush();
+            }catch (Exception ex){
+                ex.printStackTrace();
+            }
         }
     }
 

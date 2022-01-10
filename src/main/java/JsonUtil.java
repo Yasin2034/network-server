@@ -13,6 +13,12 @@ public class JsonUtil {
                 .add("username", "Server")
                 .add("message", message)
                 .build());
+        try {
+            Main.fileWriter.write(stringWriter.toString() + "\n");
+            Main.fileWriter.flush();
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
         return stringWriter.toString();
     }
 
@@ -22,6 +28,12 @@ public class JsonUtil {
                 .add("code",code)
                 .add("port", port)
                 .build());
+        try {
+            Main.fileWriter.write(stringWriter.toString() + "\n");
+            Main.fileWriter.flush();
+        }catch (Exception ex){
+            ex.printStackTrace();
+        }
         return stringWriter.toString();
     }
 
